@@ -3,7 +3,7 @@ package com.cyfonly.thriftj;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.pool2.impl.GenericKeyedObjectPoolConfig;
 import org.apache.thrift.TServiceClient;
 import org.apache.thrift.transport.TTransport;
@@ -23,9 +23,9 @@ import com.cyfonly.thriftj.pool.ThriftServer;
  */
 @SuppressWarnings("rawtypes")
 public class ThriftClient {
-	
+
 	private final static int DEFAULT_CONN_TIMEOUT = (int) TimeUnit.SECONDS.toMillis(5);
-	
+
     private String servers;
     private int loadBalance;
     private ConnectionValidator validator;
@@ -34,13 +34,13 @@ public class ThriftClient {
     private int connTimeout;
     private String backupServers;
     private int serviceLevel;
-    
+
     private ClientSelector clientSelector;
-    
+
     public ThriftClient() {
-    	
+
     }
-    
+
     /**
      * 设置 Thrift server 列表
      * @param servers Thrift server 列表，格式 "127.0.0.1:10001,127.0.0.1:10002"
@@ -50,7 +50,7 @@ public class ThriftClient {
     	this.servers = servers;
     	return this;
     }
-    
+
     /**
      * 设置负载均衡策略
      * @param loadBalance 负载均衡策略 {#link Constant#LoadBalance}
@@ -60,7 +60,7 @@ public class ThriftClient {
     	this.loadBalance = loadBalance;
     	return this;
     }
-    
+
     /**
      * 设置连接验证器
      * @param validator 连接验证器
@@ -70,7 +70,7 @@ public class ThriftClient {
     	this.validator = validator;
     	return this;
     }
-    
+
     /**
      * 设置连接池配置
      * @param poolConfig 连接池配置
@@ -80,7 +80,7 @@ public class ThriftClient {
     	this.poolConfig = poolConfig;
     	return this;
     }
-    
+
     /**
      * 设置 failover 策略
      * @param strategy failover 策略
@@ -90,7 +90,7 @@ public class ThriftClient {
     	this.failoverStrategy = failoverStrategy;
     	return this;
     }
-    
+
     /**
      * 设置连接 timeout 时长
      * @param connTimeout 连接 timeout 时长，单位秒
@@ -100,7 +100,7 @@ public class ThriftClient {
     	this.connTimeout = connTimeout;
     	return this;
     }
-    
+
     /**
      * 设置备用 Thrift server 列表
      * @param backupServers 备用 Thrift server，格式 "127.0.0.1:11001,127.0.0.1:11002"
@@ -110,7 +110,7 @@ public class ThriftClient {
     	this.backupServers = backupServers;
     	return this;
     }
-    
+
     /**
      * 设置服务级别，根据此项配置进行服务降级
      * @param serviceLevel 服务级别 {#link Constant#ServiceLevel}
@@ -120,7 +120,7 @@ public class ThriftClient {
     	this.serviceLevel = serviceLevel;
     	return this;
     }
-    
+
     /**
      * 启动 ThriftClient
      * @return ThriftClient
@@ -130,7 +130,7 @@ public class ThriftClient {
     	this.clientSelector = new ClientSelector(servers, loadBalance, validator, poolConfig, failoverStrategy, connTimeout, backupServers, serviceLevel);
     	return this;
     }
-	
+
 	/**
 	 * 根据已注册的 load balance 策略选择 TServiceClient。
 	 * 本方法适用于除 HASH 外的其他负载均衡。
@@ -140,7 +140,7 @@ public class ThriftClient {
 	public <X extends TServiceClient> X iface(Class<X> ifaceClass) {
 		return clientSelector.iface(ifaceClass);
 	}
-	
+
 	/**
 	 * 根据已注册的 load balance 策略选择 TServiceClient，使用 key 进行 hash。
 	 * 本方法仅适用于 HASH 负载均衡。
@@ -151,7 +151,7 @@ public class ThriftClient {
 	public <X extends TServiceClient> X iface(Class<X> ifaceClass, String key) {
 		return clientSelector.iface(ifaceClass, key);
     }
-	
+
 	/**
 	 * 获取当前可用的所有Thrift server 列表
 	 * @return 当前可用的所有Thrift server 列表
@@ -159,14 +159,14 @@ public class ThriftClient {
 	public List<ThriftServer> getAvailableServers() {
 		return clientSelector.getAvaliableServers();
 	}
-	
+
 	/**
 	 * 关闭连接
 	 */
 	public void close() {
 		clientSelector.close();
     }
-	
+
 	private void checkAndInit() {
 		if (this.servers == null || StringUtils.isEmpty(this.servers)) {
 			throw new ValidationException("servers can not be null or empty.");
@@ -176,7 +176,7 @@ public class ThriftClient {
 		}
 		if (this.validator == null) {
 			this.validator = new ConnectionValidator() {
-				@Override
+
 				public boolean isValid(TTransport object) {
 					return object.isOpen();
 				}
@@ -195,7 +195,7 @@ public class ThriftClient {
 			this.serviceLevel = Constant.ServiceLevel.NOT_EMPTY;
 		}
 	}
-	
+
 	private boolean checkLoadBalance() {
 		if(this.loadBalance == Constant.LoadBalance.RANDOM ||
 				this.loadBalance == Constant.LoadBalance.ROUND_ROBIN ||
@@ -205,7 +205,7 @@ public class ThriftClient {
 		}
 		return false;
 	}
-	
+
 	private boolean checkServiceLevel() {
 		if(this.serviceLevel == Constant.ServiceLevel.SERVERS_ONLY ||
 				this.serviceLevel == Constant.ServiceLevel.ALL_SERVERS ||
