@@ -2,11 +2,12 @@ package com.cyfonly.thriftj.test.thriftclient;
 
 import com.cyfonly.thriftj.ThriftClient;
 import com.cyfonly.thriftj.constants.Constant;
-import com.cyfonly.thriftj.failover.ConnectionValidator;
+import com.cyfonly.thriftj.failover.ClientValidator;
 import com.cyfonly.thriftj.failover.FailoverStrategy;
 import com.cyfonly.thriftj.test.thriftserver.thrift.QryResult;
 import com.cyfonly.thriftj.test.thriftserver.thrift.TestThriftJ;
 import org.apache.commons.pool2.impl.GenericKeyedObjectPoolConfig;
+import org.apache.thrift.TException;
 import org.apache.thrift.transport.TTransport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,22 +24,21 @@ public class ThriftClientTest {
 
     private static final String servers = "127.0.0.1:10001,127.0.0.1:10002";
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws TException {
 
-        ConnectionValidator validator = TTransport::isOpen;
-        GenericKeyedObjectPoolConfig poolConfig = new GenericKeyedObjectPoolConfig();
-        FailoverStrategy failoverStrategy = new FailoverStrategy();
+        ClientValidator<TestThriftJ.Client> validator = c -> true;
+        GenericKeyedObjectPoolConfig<TestThriftJ.Client> poolConfig = new GenericKeyedObjectPoolConfig<>();
+        FailoverStrategy<TestThriftJ> failoverStrategy = new FailoverStrategy<>();
 
-        final ThriftClient thriftClient = new ThriftClient();
-        thriftClient.servers(servers)
-                .loadBalance(Constant.LoadBalance.RANDOM)
+        final ThriftClient<TestThriftJ.Client> thriftClient = new ThriftClient<>(TestThriftJ.Client.class, servers);
+        TestThriftJ.Client c = (TestThriftJ.Client) thriftClient.loadBalance(Constant.LoadBalance.RANDOM)
                 .connectionValidator(validator)
                 .poolConfig(poolConfig)
                 .failoverStrategy(failoverStrategy)
                 .connTimeout(5)
                 .backupServers("")
                 .serviceLevel(Constant.ServiceLevel.NOT_EMPTY)
-                .start();
+                .start().iface();
 
 //		Executors.newSingleThreadScheduledExecutor().scheduleAtFixedRate(new Runnable() {
 //			@Override
@@ -52,11 +52,12 @@ public class ThriftClientTest {
 //				logger.info("ThriftServers:[" + (buffer.length() == 0 ? "No avaliable server" : buffer.toString().substring(0, buffer.length()-1)) + "]");
 //
 //				if(buffer.length() > 0){
+        System.out.println("===============");
         try {
+
             //测试服务是否可用
-            TestThriftJ.Client client = thriftClient.iface(TestThriftJ.Client.class);
             for (int i = 0; i < 100; i++) {
-                QryResult result = client.qryTest(1);
+                QryResult result = c.qryTest(i);
                 System.out.println("result[code=" + result.code + " msg=" + result.msg + "]");
             }
         } catch (Throwable t) {
@@ -65,6 +66,16 @@ public class ThriftClientTest {
 //				}
 //			}
 //		}, 0, 10, TimeUnit.SECONDS);
+
+//        TSocket ts = new TSocket("127.0.0.1", 10001);
+//        ts.open();
+//        TBinaryProtocol tBinaryProtocol = new TBinaryProtocol(new TFramedTransport(ts));
+//
+//
+//        TestThriftJ.Client client = new TestThriftJ.Client(tBinaryProtocol);
+//        QryResult q = client.qryTest(1);
+//        System.out.println(q);
+        thriftClient.close();
     }
 
 

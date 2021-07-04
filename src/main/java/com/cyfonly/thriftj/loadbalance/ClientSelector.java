@@ -12,17 +12,17 @@ import net.sf.cglib.proxy.*;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.pool2.impl.GenericKeyedObjectPoolConfig;
 import org.apache.thrift.TServiceClient;
-import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.protocol.TProtocol;
-import org.apache.thrift.transport.TTransport;
 import org.apache.thrift.transport.TTransportException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 
 /**
@@ -31,7 +31,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * @author yunfeng.cheng
  * @create 2016-11-21
  */
-public class ClientSelector {
+public class ClientSelector<X extends TServiceClient> {
 
     private static final Logger logger =
             LoggerFactory.getLogger(ClientSelector.class);
@@ -39,13 +39,15 @@ public class ClientSelector {
     private FailoverChecker failoverChecker;
     private DefaultThriftConnectionPool poolProvider;
     private int loadBalance;
+    private Class<X> xClass;
 
     private AtomicInteger i = new AtomicInteger(0);
 
     @SuppressWarnings({"rawtypes", "unchecked"})
-    public ClientSelector(String servers, int loadBalance, ConnectionValidator validator, GenericKeyedObjectPoolConfig poolConfig, FailoverStrategy strategy, int connTimeout, String backupServers, int serviceLevel) {
+    public ClientSelector(String servers, int loadBalance, ClientValidator validator, GenericKeyedObjectPoolConfig poolConfig, FailoverStrategy strategy, int connTimeout, String backupServers, int serviceLevel,
+                          Class<X> xClass) {
         this.failoverChecker = new FailoverChecker(validator, strategy, serviceLevel);
-        this.poolProvider = new DefaultThriftConnectionPool(new ThriftConnectionFactory(failoverChecker, connTimeout), poolConfig);
+        this.poolProvider = new DefaultThriftConnectionPool(new ThriftConnectionFactory(failoverChecker, connTimeout, xClass), poolConfig);
         failoverChecker.setConnectionPool(poolProvider);
         failoverChecker.setServerList(ThriftServer.parse(servers));
         if (StringUtils.isNotEmpty(backupServers)) {
@@ -54,6 +56,7 @@ public class ClientSelector {
             failoverChecker.setBackupServerList(new ArrayList<ThriftServer>());
         }
         failoverChecker.startChecking();
+        this.xClass = xClass;
     }
 
 
@@ -148,9 +151,11 @@ public class ClientSelector {
     public class ClientFactory implements MethodInterceptor {
 
         private final Class<?> target;
-        TProtocol protocol = null;
+        AtomicReference<TProtocol> protocolRef = new AtomicReference<>();
         ThriftServer selected;
         private String key;
+        private TServiceClient t;
+        Enhancer en;
 
         public ClientFactory(Class<?> target) {
             this.target = target;
@@ -165,43 +170,64 @@ public class ClientSelector {
 
 
         public Object getProxyInstance() {
-            Enhancer en = new Enhancer();
+            en = new Enhancer();
             en.setSuperclass(target);
             en.setCallback(this);
 
-            return en.create(new Class[]{TProtocol.class}, new Object[]{protocol});
+//            try {
+//                return target.newInstance();
+//            } catch (InstantiationException e) {
+//                e.printStackTrace();
+//            } catch (IllegalAccessException e) {
+//                e.printStackTrace();
+//            }
+            return en.create(new Class[]{TProtocol.class}, new Object[]{protocolRef.get()});
         }
 
         @Override
         public Object intercept(Object o, Method method, Object[] objects, MethodProxy methodProxy) throws Throwable {
             logger.info("before");
+
+            // 负载均衡
             this.selected = StringUtils.isEmpty(key) ? findServer() : getHashIface(key);
             logger.info("load balancer: {} {}", this.selected.getHost(), this.selected.getPort());
 
-            final TTransport transport;
+//            final TTransport transport = new TFramedTransport(new T)
+            X x;
             try {
-                transport = poolProvider.getConnection(selected);
+                x = (X) poolProvider.getClient(selected);
             } catch (RuntimeException e) {
                 if (e.getCause() != null && e.getCause() instanceof TTransportException) {
                     failoverChecker.getFailoverStrategy().fail(selected);
                 }
                 throw e;
             }
-            protocol = new TBinaryProtocol(transport);
+//            TBinaryProtocol newValue = new TBinaryProtocol(transport);
+
+//            protocolRef.set(newValue);
+            en.setCallback(null);
+//            Object oooo = en.create(new Class[]{TProtocol.class}, new Object[]{protocolRef.get()});
+
+            Constructor<?> c = this.target.getConstructor(TProtocol.class);
+//            Object oooo = c.newInstance(newValue);
+
 
             boolean success = false;
             try {
-                Object result = methodProxy.invoke(o, objects);
+                Object result = methodProxy.invoke(x, objects);
                 success = true;
                 return result;
+            } catch (Exception e) {
+                logger.error("error. ", e);
             } finally {
                 if (success) {
-                    poolProvider.returnConnection(selected, transport);
+                    poolProvider.returnClient(selected, x);
                 } else {
                     failoverChecker.getFailoverStrategy().fail(selected);
-                    poolProvider.returnBrokenConnection(selected, transport);
+                    poolProvider.returnBrokenClient(selected, x);
                 }
             }
+            return null;
         }
 
     }

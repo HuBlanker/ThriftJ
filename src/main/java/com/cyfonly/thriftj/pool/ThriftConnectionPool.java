@@ -1,22 +1,23 @@
 package com.cyfonly.thriftj.pool;
 
-import org.apache.thrift.transport.TTransport;
+import org.apache.thrift.TServiceClient;
 
 
 /**
  * Thrift 连接池抽象接口
+ *
  * @author yunfeng.cheng
  * @create 2016-11-18
  */
-public interface ThriftConnectionPool {
-	
-	TTransport getConnection(ThriftServer thriftServer);
+public interface ThriftConnectionPool<X extends TServiceClient> {
 
-    void returnConnection(ThriftServer thriftServer, TTransport transport);
+    X getClient(ThriftServer thriftServer);
 
-    void returnBrokenConnection(ThriftServer thriftServer, TTransport transport);
+    void returnClient(ThriftServer thriftServer, X x);
 
-	void close();
+    void returnBrokenClient(ThriftServer thriftServer, X x);
+
+    void close();
 
     void clear(ThriftServer thriftServer);
 

@@ -1,5 +1,6 @@
 package com.cyfonly.thriftj.failover;
 
+import org.apache.thrift.TServiceClient;
 import org.apache.thrift.transport.TTransport;
 
 /**
@@ -7,8 +8,8 @@ import org.apache.thrift.transport.TTransport;
  * @author yunfeng.cheng
  * @create 2016-11-19
  */
-public interface ConnectionValidator {
+public interface ClientValidator<X extends TServiceClient> {
 
-	boolean isValid(TTransport object);
+	boolean isValid(X x);
 	
 }
