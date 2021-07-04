@@ -1,8 +1,8 @@
 package com.cyfonly.thriftj.test.thriftserver;
+import com.cyfonly.thriftj.test.thriftserver.thrift.TestThriftJ;
 import org.apache.thrift.TException;
 
 import com.cyfonly.thriftj.test.thriftserver.thrift.QryResult;
-import com.cyfonly.thriftj.test.thriftserver.thrift.TestThriftJ;
 
 
 /**
