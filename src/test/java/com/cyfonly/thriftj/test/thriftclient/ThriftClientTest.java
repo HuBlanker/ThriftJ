@@ -22,7 +22,7 @@ import org.slf4j.LoggerFactory;
 public class ThriftClientTest {
     private static final Logger logger = LoggerFactory.getLogger(ThriftClientTest.class);
 
-    private static final String servers = "127.0.0.1:10001,127.0.0.1:10002";
+    private static final String servers = "127.0.0.1:10001:13,127.0.0.1:10002:26";
 
     public static void main(String[] args) throws TException {
 
@@ -31,7 +31,8 @@ public class ThriftClientTest {
         FailoverStrategy<TestThriftJ> failoverStrategy = new FailoverStrategy<>();
 
         final ThriftClient<TestThriftJ.Client> thriftClient = new ThriftClient<>(TestThriftJ.Client.class, servers);
-        TestThriftJ.Client c = (TestThriftJ.Client) thriftClient.loadBalance(Constant.LoadBalance.RANDOM)
+        TestThriftJ.Client c = (TestThriftJ.Client) thriftClient
+                .loadBalance(Constant.LoadBalance.RANDOM_WRIGHT)
                 .connectionValidator(validator)
                 .poolConfig(poolConfig)
                 .failoverStrategy(failoverStrategy)
@@ -61,8 +62,10 @@ public class ThriftClientTest {
                 System.out.println("result[code=" + result.code + " msg=" + result.msg + "]");
             }
         } catch (Throwable t) {
-//            logger.error("-------------exception happen", t);
+            logger.error("-------------exception happen", t);
         }
+
+
 //				}
 //			}
 //		}, 0, 10, TimeUnit.SECONDS);

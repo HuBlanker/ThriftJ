@@ -29,7 +29,7 @@ public class ThriftClient<X extends TServiceClient> {
     private final String servers;
     private final Class<X> xClass;
 
-    private int loadBalance;
+    private Constant.LoadBalance loadBalance;
     private ClientValidator<X> validator;
     private GenericKeyedObjectPoolConfig poolConfig;
     private FailoverStrategy failoverStrategy;
@@ -50,7 +50,7 @@ public class ThriftClient<X extends TServiceClient> {
      * @param loadBalance 负载均衡策略 {#link Constant#LoadBalance}
      * @return ThriftClient
      */
-    public ThriftClient loadBalance(int loadBalance) {
+    public ThriftClient loadBalance(Constant.LoadBalance loadBalance) {
         this.loadBalance = loadBalance;
         return this;
     }
@@ -61,7 +61,7 @@ public class ThriftClient<X extends TServiceClient> {
      * @param validator 连接验证器
      * @return ThriftClient
      */
-    public ThriftClient connectionValidator(ClientValidator validator) {
+    public ThriftClient connectionValidator(ClientValidator<X> validator) {
         this.validator = validator;
         return this;
     }
@@ -127,7 +127,7 @@ public class ThriftClient<X extends TServiceClient> {
      */
     public ThriftClient start() {
         checkAndInit();
-        this.clientSelector = new ClientSelector(servers, loadBalance, validator, poolConfig, failoverStrategy, connTimeout, backupServers, serviceLevel, xClass);
+        this.clientSelector = new ClientSelector<>(servers, loadBalance, validator, poolConfig, failoverStrategy, connTimeout, backupServers, serviceLevel, xClass);
         return this;
     }
 
@@ -156,18 +156,11 @@ public class ThriftClient<X extends TServiceClient> {
         if (this.servers == null || StringUtils.isEmpty(this.servers)) {
             throw new ValidationException("servers can not be null or empty.");
         }
-        if (!checkLoadBalance()) {
+        if (this.loadBalance == null) {
             this.loadBalance = Constant.LoadBalance.RANDOM;
         }
         if (this.validator == null) {
-            this.validator = new ClientValidator() {
-
-                @Override
-                public boolean isValid(TServiceClient tServiceClient) {
-                    return true;
-                }
-
-            };
+            this.validator = tServiceClient -> true;
         }
         if (this.poolConfig == null) {
             this.poolConfig = new GenericKeyedObjectPoolConfig();
@@ -181,16 +174,6 @@ public class ThriftClient<X extends TServiceClient> {
         if (!checkServiceLevel()) {
             this.serviceLevel = Constant.ServiceLevel.NOT_EMPTY;
         }
-    }
-
-    private boolean checkLoadBalance() {
-        if (this.loadBalance == Constant.LoadBalance.RANDOM ||
-                this.loadBalance == Constant.LoadBalance.ROUND_ROBIN ||
-                this.loadBalance == Constant.LoadBalance.WEIGHT ||
-                this.loadBalance == Constant.LoadBalance.HASH) {
-            return true;
-        }
-        return false;
     }
 
     private boolean checkServiceLevel() {
