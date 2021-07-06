@@ -1,7 +1,6 @@
 package com.cyfonly.thriftj.loadbalance;
 
 import com.cyfonly.thriftj.constants.Constant;
-import com.cyfonly.thriftj.exceptions.ValidationException;
 import com.cyfonly.thriftj.failover.*;
 import com.cyfonly.thriftj.pool.*;
 import net.sf.cglib.proxy.*;
@@ -14,9 +13,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.List;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 
 
 /**
@@ -33,6 +33,7 @@ public class ClientSelector<X extends TServiceClient> {
     private final DefaultThriftConnectionPool<X> poolProvider;
     private final AbstractLoadBalancer loadBalancer;
     private final Constant.LoadBalance loadBalance;
+    private final boolean useHash;
 
     @SuppressWarnings({"rawtypes", "unchecked"})
     public ClientSelector(String servers, Constant.LoadBalance loadBalance, ClientValidator validator, GenericKeyedObjectPoolConfig poolConfig, FailoverStrategy strategy, int connTimeout, String backupServers, int serviceLevel,
@@ -49,6 +50,7 @@ public class ClientSelector<X extends TServiceClient> {
         failoverChecker.startChecking();
         this.loadBalance = loadBalance;
         this.loadBalancer = by(servers);
+        this.useHash = loadBalance == Constant.LoadBalance.HASH || loadBalance == Constant.LoadBalance.CONSISTENT_HASH;
     }
 
     private AbstractLoadBalancer by(String servers) {
@@ -60,6 +62,11 @@ public class ClientSelector<X extends TServiceClient> {
             case RANDOM_WRIGHT:
                 return new RandomWithWeightLoadBalancer(servers);
             case HASH:
+                return new DefaultHashLoadBalancer(servers);
+            case CONSISTENT_HASH:
+                return new ConsistentHashLoadBalancer(servers);
+            case LEAST_CONNECTION:
+                return new LeastConnectionLoadBalancer(servers);
             default:
                 return null;
         }
@@ -67,14 +74,21 @@ public class ClientSelector<X extends TServiceClient> {
 
     @SuppressWarnings("unchecked")
     public <X extends TServiceClient> X iface(final Class<X> ifaceClass) {
-        if (this.loadBalance == Constant.LoadBalance.HASH) {
-            throw new ValidationException("Can not use HASH without a key.");
-        }
         try {
             ClientFactory factory = new ClientFactory(ifaceClass);
-            X x = (X) factory.getProxyInstance();
 
-            return x;
+            return (X) factory.getProxyInstance();
+        } catch (Exception e) {
+            throw new RuntimeException("Fail to create proxy.", e);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    public <X extends TServiceClient> X iface(final Class<X> ifaceClass, Function<Object[], byte[]> keyFunction) {
+        try {
+
+            ClientFactory factory = new ClientFactory(ifaceClass, keyFunction);
+            return (X) factory.getProxyInstance();
         } catch (Exception e) {
             throw new RuntimeException("Fail to create proxy.", e);
         }
@@ -96,12 +110,17 @@ public class ClientSelector<X extends TServiceClient> {
         private final Class<?> target;
         AtomicReference<TProtocol> protocolRef = new AtomicReference<>();
         ThriftServer selected;
-        private String key;
-        private TServiceClient t;
+        private Function<Object[], byte[]> keyFunction;
         Enhancer en;
 
         public ClientFactory(Class<?> target) {
             this.target = target;
+            this.keyFunction = null;
+        }
+
+        public ClientFactory(Class<?> target, Function<Object[], byte[]> keyFunction) {
+            this.target = target;
+            this.keyFunction = keyFunction;
         }
 
         public Object getProxyInstance() {
@@ -113,13 +132,18 @@ public class ClientSelector<X extends TServiceClient> {
         }
 
         @Override
-        public Object intercept(Object o, Method method, Object[] objects, MethodProxy methodProxy) throws Throwable {
-            logger.info("before");
+        public Object intercept(Object o, Method method, Object[] args, MethodProxy methodProxy) throws Throwable {
 
             // 负载均衡
             assert loadBalancer != null;
-            this.selected = loadBalancer.find();
-            logger.info("load balancer: {} {}", this.selected.getHost(), this.selected.getPort());
+            if (useHash) {
+                byte[] key = this.keyFunction == null ? Arrays.toString(args).getBytes(StandardCharsets.UTF_8) :
+                        keyFunction.apply(args);
+                this.selected = loadBalancer.find(key);
+            } else {
+                this.selected = loadBalancer.find();
+            }
+//            logger.info("load balancer: {} {}", this.selected.getHost(), this.selected.getPort());
 
             X x;
             try {
@@ -132,7 +156,7 @@ public class ClientSelector<X extends TServiceClient> {
             }
             boolean success = false;
             try {
-                Object result = methodProxy.invoke(x, objects);
+                Object result = methodProxy.invoke(x, args);
                 success = true;
                 return result;
             } catch (Exception e) {

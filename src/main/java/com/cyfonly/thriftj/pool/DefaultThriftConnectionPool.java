@@ -26,7 +26,9 @@ public class DefaultThriftConnectionPool<X extends TServiceClient> implements Th
     @Override
     public X getClient(ThriftServer thriftServer) {
         try {
-            return connections.borrowObject(thriftServer);
+            X x = connections.borrowObject(thriftServer);
+            thriftServer.incrGoing();
+            return x;
         } catch (Exception e) {
             logger.error("Fail to get client for {}:{}", thriftServer.getHost(), thriftServer.getPort(), e);
             throw new RuntimeException(e);
@@ -36,12 +38,14 @@ public class DefaultThriftConnectionPool<X extends TServiceClient> implements Th
     @Override
     public void returnClient(ThriftServer thriftServer, X x) {
         connections.returnObject(thriftServer, x);
+        thriftServer.decrGoing();
     }
 
     @Override
     public void returnBrokenClient(ThriftServer thriftServer, X x) {
         try {
             connections.invalidateObject(thriftServer, x);
+            thriftServer.decrGoing();
         } catch (Exception e) {
             logger.warn("Fail to invalid object:{},{}", thriftServer, x, e);
         }

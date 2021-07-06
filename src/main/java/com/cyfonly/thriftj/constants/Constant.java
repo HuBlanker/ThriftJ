@@ -24,6 +24,10 @@ public class Constant {
          **/
         RANDOM_WRIGHT,
         /**
+         * 最小连接数
+         */
+        LEAST_CONNECTION,
+        /**
          * 哈希
          **/
         HASH,

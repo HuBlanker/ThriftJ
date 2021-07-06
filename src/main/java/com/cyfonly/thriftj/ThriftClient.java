@@ -12,6 +12,7 @@ import org.apache.thrift.TServiceClient;
 
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 
 
 /**
@@ -133,6 +134,16 @@ public class ThriftClient<X extends TServiceClient> {
 
     @SuppressWarnings("unchecked")
     public X iface() {
+        return (X) this.clientSelector.iface(this.xClass);
+    }
+
+    @SuppressWarnings("unchecked")
+    public X ifaceHash(Function<Object[], byte[]> keyFunction) {
+        return (X) this.clientSelector.iface(this.xClass, keyFunction);
+    }
+
+    @SuppressWarnings("unchecked")
+    public X ifaceHash() {
         return (X) this.clientSelector.iface(this.xClass);
     }
 

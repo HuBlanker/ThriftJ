@@ -5,6 +5,7 @@ import com.google.common.collect.Lists;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicInteger;
 
 
 /**
@@ -21,6 +22,7 @@ public final class ThriftServer {
     private final String host;
     private final int port;
     private final int weight;
+    private final AtomicInteger going = new AtomicInteger(0);
 
     public ThriftServer(String serverConfig, Constant.ServersFormat format) {
         String[] split = serverConfig.split(SERVER_SEPARATOR);
@@ -73,5 +75,17 @@ public final class ThriftServer {
 
     public String getKey() {
         return host + ":" + port + ":" + weight;
+    }
+
+    public void incrGoing() {
+        this.going.incrementAndGet();
+    }
+
+    public void decrGoing() {
+        this.going.decrementAndGet();
+    }
+
+    public int getGoing() {
+        return going.get();
     }
 }

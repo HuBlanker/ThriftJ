@@ -8,9 +8,10 @@ import com.cyfonly.thriftj.test.thriftserver.thrift.QryResult;
 import com.cyfonly.thriftj.test.thriftserver.thrift.TestThriftJ;
 import org.apache.commons.pool2.impl.GenericKeyedObjectPoolConfig;
 import org.apache.thrift.TException;
-import org.apache.thrift.transport.TTransport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.function.Function;
 
 
 /**
@@ -32,27 +33,24 @@ public class ThriftClientTest {
 
         final ThriftClient<TestThriftJ.Client> thriftClient = new ThriftClient<>(TestThriftJ.Client.class, servers);
         TestThriftJ.Client c = (TestThriftJ.Client) thriftClient
-                .loadBalance(Constant.LoadBalance.RANDOM_WRIGHT)
+                .loadBalance(Constant.LoadBalance.LEAST_CONNECTION)
                 .connectionValidator(validator)
                 .poolConfig(poolConfig)
                 .failoverStrategy(failoverStrategy)
                 .connTimeout(5)
                 .backupServers("")
                 .serviceLevel(Constant.ServiceLevel.NOT_EMPTY)
-                .start().iface();
+                .start().ifaceHash(new Function<Object[], byte[]>() {
+                    @Override
+                    public byte[] apply(Object[] objects) {
+                        Object o = objects[0];
+                        Integer i = (Integer) o;
+                        byte[] r = new byte[4];
+                        r[3] = i.byteValue();
+                        return r;
+                    }
+                });
 
-//		Executors.newSingleThreadScheduledExecutor().scheduleAtFixedRate(new Runnable() {
-//			@Override
-//			public void run() {
-//				//打印从thriftClient获取到的可用服务列表
-//				StringBuffer buffer = new StringBuffer();
-//				List<ThriftServer> servers = thriftClient.getAvailableServers();
-//				for(ThriftServer server : servers){
-//					buffer.append(server.getHost()).append(":").append(server.getPort()).append(",");
-//				}
-//				logger.info("ThriftServers:[" + (buffer.length() == 0 ? "No avaliable server" : buffer.toString().substring(0, buffer.length()-1)) + "]");
-//
-//				if(buffer.length() > 0){
         System.out.println("===============");
         try {
 
@@ -65,19 +63,6 @@ public class ThriftClientTest {
             logger.error("-------------exception happen", t);
         }
 
-
-//				}
-//			}
-//		}, 0, 10, TimeUnit.SECONDS);
-
-//        TSocket ts = new TSocket("127.0.0.1", 10001);
-//        ts.open();
-//        TBinaryProtocol tBinaryProtocol = new TBinaryProtocol(new TFramedTransport(ts));
-//
-//
-//        TestThriftJ.Client client = new TestThriftJ.Client(tBinaryProtocol);
-//        QryResult q = client.qryTest(1);
-//        System.out.println(q);
         thriftClient.close();
     }
 
