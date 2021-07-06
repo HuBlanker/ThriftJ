@@ -21,7 +21,6 @@ import java.util.function.Function;
  * @author yunfeng.cheng
  * @create 2016-11-11
  */
-@SuppressWarnings("rawtypes")
 public class ThriftClient<X extends TServiceClient> {
 
     private final static int DEFAULT_CONN_TIMEOUT = (int) TimeUnit.SECONDS.toMillis(5);
@@ -32,13 +31,13 @@ public class ThriftClient<X extends TServiceClient> {
 
     private Constant.LoadBalance loadBalance;
     private ClientValidator<X> validator;
-    private GenericKeyedObjectPoolConfig poolConfig;
-    private FailoverStrategy failoverStrategy;
+    private GenericKeyedObjectPoolConfig<X> poolConfig;
+    private FailoverStrategy<X> failoverStrategy;
     private int connTimeout;
     private String backupServers;
     private int serviceLevel;
 
-    private ClientSelector clientSelector;
+    private ClientSelector<X> clientSelector;
 
     public ThriftClient(Class<X> xClass, String servers) {
         this.xClass = xClass;
@@ -51,7 +50,7 @@ public class ThriftClient<X extends TServiceClient> {
      * @param loadBalance 负载均衡策略 {#link Constant#LoadBalance}
      * @return ThriftClient
      */
-    public ThriftClient loadBalance(Constant.LoadBalance loadBalance) {
+    public ThriftClient<X> loadBalance(Constant.LoadBalance loadBalance) {
         this.loadBalance = loadBalance;
         return this;
     }
@@ -62,7 +61,7 @@ public class ThriftClient<X extends TServiceClient> {
      * @param validator 连接验证器
      * @return ThriftClient
      */
-    public ThriftClient connectionValidator(ClientValidator<X> validator) {
+    public ThriftClient<X> connectionValidator(ClientValidator<X> validator) {
         this.validator = validator;
         return this;
     }
@@ -73,7 +72,7 @@ public class ThriftClient<X extends TServiceClient> {
      * @param poolConfig 连接池配置
      * @return ThriftClient
      */
-    public ThriftClient poolConfig(GenericKeyedObjectPoolConfig poolConfig) {
+    public ThriftClient<X> poolConfig(GenericKeyedObjectPoolConfig<X> poolConfig) {
         this.poolConfig = poolConfig;
         return this;
     }
@@ -83,7 +82,7 @@ public class ThriftClient<X extends TServiceClient> {
      *
      * @return ThriftClient
      */
-    public ThriftClient failoverStrategy(FailoverStrategy failoverStrategy) {
+    public ThriftClient<X> failoverStrategy(FailoverStrategy<X> failoverStrategy) {
         this.failoverStrategy = failoverStrategy;
         return this;
     }
@@ -94,7 +93,7 @@ public class ThriftClient<X extends TServiceClient> {
      * @param connTimeout 连接 timeout 时长，单位秒
      * @return ThriftClient
      */
-    public ThriftClient connTimeout(int connTimeout) {
+    public ThriftClient<X> connTimeout(int connTimeout) {
         this.connTimeout = connTimeout;
         return this;
     }
@@ -105,7 +104,7 @@ public class ThriftClient<X extends TServiceClient> {
      * @param backupServers 备用 Thrift server，格式 "127.0.0.1:11001,127.0.0.1:11002"
      * @return ThriftClient
      */
-    public ThriftClient backupServers(String backupServers) {
+    public ThriftClient<X> backupServers(String backupServers) {
         this.backupServers = backupServers;
         return this;
     }
@@ -116,7 +115,7 @@ public class ThriftClient<X extends TServiceClient> {
      * @param serviceLevel 服务级别 {#link Constant#ServiceLevel}
      * @return
      */
-    public ThriftClient serviceLevel(int serviceLevel) {
+    public ThriftClient<X> serviceLevel(int serviceLevel) {
         this.serviceLevel = serviceLevel;
         return this;
     }
@@ -126,25 +125,22 @@ public class ThriftClient<X extends TServiceClient> {
      *
      * @return ThriftClient
      */
-    public ThriftClient start() {
+    public ThriftClient<X> start() {
         checkAndInit();
         this.clientSelector = new ClientSelector<>(servers, loadBalance, validator, poolConfig, failoverStrategy, connTimeout, backupServers, serviceLevel, xClass);
         return this;
     }
 
-    @SuppressWarnings("unchecked")
     public X iface() {
-        return (X) this.clientSelector.iface(this.xClass);
+        return this.clientSelector.iface(this.xClass);
     }
 
-    @SuppressWarnings("unchecked")
     public X ifaceHash(Function<Object[], byte[]> keyFunction) {
-        return (X) this.clientSelector.iface(this.xClass, keyFunction);
+        return this.clientSelector.iface(this.xClass, keyFunction);
     }
 
-    @SuppressWarnings("unchecked")
     public X ifaceHash() {
-        return (X) this.clientSelector.iface(this.xClass);
+        return this.clientSelector.iface(this.xClass);
     }
 
     /**
@@ -174,7 +170,7 @@ public class ThriftClient<X extends TServiceClient> {
             this.validator = tServiceClient -> true;
         }
         if (this.poolConfig == null) {
-            this.poolConfig = new GenericKeyedObjectPoolConfig();
+            this.poolConfig = new GenericKeyedObjectPoolConfig<>();
         }
         if (this.failoverStrategy == null) {
             this.failoverStrategy = new FailoverStrategy<>();

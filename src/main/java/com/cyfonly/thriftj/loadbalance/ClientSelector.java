@@ -73,7 +73,7 @@ public class ClientSelector<X extends TServiceClient> {
     }
 
     @SuppressWarnings("unchecked")
-    public <X extends TServiceClient> X iface(final Class<X> ifaceClass) {
+    public X iface(final Class<X> ifaceClass) {
         try {
             ClientFactory factory = new ClientFactory(ifaceClass);
 
@@ -84,7 +84,7 @@ public class ClientSelector<X extends TServiceClient> {
     }
 
     @SuppressWarnings("unchecked")
-    public <X extends TServiceClient> X iface(final Class<X> ifaceClass, Function<Object[], byte[]> keyFunction) {
+    public X iface(final Class<X> ifaceClass, Function<Object[], byte[]> keyFunction) {
         try {
 
             ClientFactory factory = new ClientFactory(ifaceClass, keyFunction);
@@ -107,18 +107,18 @@ public class ClientSelector<X extends TServiceClient> {
 
     public class ClientFactory implements MethodInterceptor {
 
-        private final Class<?> target;
+        private final Class<X> target;
         AtomicReference<TProtocol> protocolRef = new AtomicReference<>();
         ThriftServer selected;
-        private Function<Object[], byte[]> keyFunction;
+        private final Function<Object[], byte[]> keyFunction;
         Enhancer en;
 
-        public ClientFactory(Class<?> target) {
+        public ClientFactory(Class<X> target) {
             this.target = target;
             this.keyFunction = null;
         }
 
-        public ClientFactory(Class<?> target, Function<Object[], byte[]> keyFunction) {
+        public ClientFactory(Class<X> target, Function<Object[], byte[]> keyFunction) {
             this.target = target;
             this.keyFunction = keyFunction;
         }
